@@ -46,7 +46,7 @@ jobs:
         working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --publish never -c.win.publish=null
+        run: npx electron-builder --win --publish never
       - name: Upload Windows Build Artifacts
         uses: actions/upload-artifact@v4
         with:
