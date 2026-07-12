@@ -1,55 +1,202 @@
-name: Build Windows EXE
+name: Build & Package
+
 on:
   workflow_dispatch:
+    inputs:
+      source_repo:
+        description: 'Source repo to build from (owner/repo)'
+        required: true
+        default: 'yangshuo8023/LocalMiniDrama'
+      source_ref:
+        description: 'Branch or tag to build'
+        required: true
+        default: 'main'
+
 permissions:
   contents: read
+
 jobs:
   build-windows:
-    name: Build Windows Installer
+    name: Build Windows EXE
     runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: Checkout source repo
         uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.source_repo }}
+          ref: ${{ github.event.inputs.source_ref }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: desktop/package-lock.json
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Install frontend dependencies
         working-directory: frontweb
         run: npm ci
+
       - name: Build frontend
         working-directory: frontweb
         run: npm run build
+
       - name: Install backend dependencies
         working-directory: backend-node
         env:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npm ci
+
       - name: Install desktop dependencies and rebuild native modules
         working-directory: desktop
         env:
           NODE_TLS_REJECT_UNAUTHORIZED: '0'
         run: npm ci
+
       - name: Copy frontend dist
         working-directory: desktop
         run: node scripts/copy-front.js
+
       - name: Copy backend
         working-directory: desktop
         run: node scripts/copy-backend.js
-      - name: Build Standard Installer
+
+      - name: Build Windows EXE
         working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --publish never
-      - name: Upload Windows Build Artifacts
+
+      - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
+          name: windows-exe
           path: desktop/release/*.exe
+          retention-days: 7
+
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.source_repo }}
+          ref: ${{ github.event.inputs.source_ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install frontend dependencies
+        working-directory: frontweb
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontweb
+        run: npm run build
+
+      - name: Install backend dependencies
+        working-directory: backend-node
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npm ci
+
+      - name: Install desktop dependencies and rebuild native modules
+        working-directory: desktop
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: npm ci
+
+      - name: Copy frontend dist
+        working-directory: desktop
+        run: node scripts/copy-front.js
+
+      - name: Copy backend
+        working-directory: desktop
+        run: node scripts/copy-backend.js
+
+      - name: Build macOS DMG (arm64 + x64)
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --publish never
+
+      - name: Upload macOS DMGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: desktop/release/*.dmg
+          retention-days: 7
+
+  package-delivery:
+    name: Create Delivery Packages
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.source_repo }}
+          ref: ${{ github.event.inputs.source_ref }}
+
+      - name: Download Windows EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+          path: artifacts/
+
+      - name: Download macOS DMGs
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+          path: artifacts/
+
+      - name: Create delivery packages
+        run: |
+          mkdir -p delivery/基础版 delivery/进阶版 delivery/陪跑版
+          
+          # 复制所有构建产物
+          cp artifacts/*.exe delivery/基础版/ 2>/dev/null || true
+          cp artifacts/*.dmg delivery/基础版/ 2>/dev/null || true
+          cp artifacts/*.exe delivery/进阶版/ 2>/dev/null || true
+          cp artifacts/*.dmg delivery/进阶版/ 2>/dev/null || true
+          cp artifacts/*.exe delivery/陪跑版/ 2>/dev/null || true
+          cp artifacts/*.dmg delivery/陪跑版/ 2>/dev/null || true
+          
+          # 复制文档
+          cp 交付物/*.txt delivery/基础版/ 2>/dev/null || true
+          cp 交付物/*.md delivery/基础版/ 2>/dev/null || true
+          cp 交付物/*.txt delivery/进阶版/ 2>/dev/null || true
+          cp 交付物/*.md delivery/进阶版/ 2>/dev/null || true
+          cp 交付物/*.txt delivery/陪跑版/ 2>/dev/null || true
+          cp 交付物/*.md delivery/陪跑版/ 2>/dev/null || true
+          
+          # 压缩
+          cd delivery
+          zip -r "../基础版.zip" "基础版/"
+          zip -r "../进阶版.zip" "进阶版/"
+          zip -r "../陪跑版.zip" "陪跑版/"
+
+      - name: Upload Delivery Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: delivery-packages
+          path: |
+            基础版.zip
+            进阶版.zip
+            陪跑版.zip
           retention-days: 7
