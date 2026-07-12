@@ -56,23 +56,33 @@
       {
         "from": "frontweb-dist",
         "to": "frontweb/dist",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../example_drama",
         "to": "example_drama",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../backend-node/tools/ffmpeg",
         "to": "ffmpeg",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": null,
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "publish": null
     },
     "nsis": {
       "oneClick": false,
