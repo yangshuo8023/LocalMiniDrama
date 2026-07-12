@@ -433,7 +433,7 @@ const total = ref(0)
 
 const showAiConfigDialog = ref(false)
 const showWechat = ref(false)
-const vendorLockEnabled = ref(false)
+const vendorLockEnabled = ref(true)
 
 // 图片预览
 const previewImageUrl = ref(null)
